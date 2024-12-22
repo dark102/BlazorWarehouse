@@ -8,7 +8,9 @@ namespace BlazorApp1.Service
 {
     public class CashService
     {
-        private ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>> _cache = new ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>>();
+        private ConcurrentDictionary<ProductWarehouseIds, int> _dinmickCache = new ConcurrentDictionary<ProductWarehouseIds, int>();
+        private Dictionary<WarehouseViewModel, List<ProductViewModel>> _statickCache = new Dictionary<WarehouseViewModel, List<ProductViewModel>>();
+
         private readonly ILogger<CashService> _loger;
         private int _counter = 0;
 
@@ -20,15 +22,44 @@ namespace BlazorApp1.Service
         {
             return _counter;
         }
-        public ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>> GetCash()
+        public ConcurrentDictionary<ProductWarehouseIds, int> GetDinamickCash()
         {
-            return _cache;
+            return _dinmickCache;
         }
-        public void InitCash(ApplicationDbContext dbContext)
+        public Dictionary<WarehouseViewModel, List<ProductViewModel>> GetStatickCash()
+        {
+            return _statickCache;
+        }
+        public int GetCountByIds(ProductWarehouseIds productWarehouseIds)
+        {
+            var itemKey = _dinmickCache.FirstOrDefault(x => x.Key.ProductId == productWarehouseIds.ProductId && x.Key.WarehouseId == productWarehouseIds.WarehouseId).Key;
+            _dinmickCache.TryGetValue(itemKey, out int count);
+            return count;
+        }
+        public void InitDinamickCash(ApplicationDbContext dbContext)
         {
             try
             {
-                if (_cache.Count == 0)
+                if (_dinmickCache.Count == 0)
+                {
+                    var productsWarehousesList = dbContext.ProductsWarehouses.ToList();
+                    foreach (var productsWarehouse in productsWarehousesList)
+                    {
+                        if (!_dinmickCache.TryAdd(new ProductWarehouseIds { WarehouseId = productsWarehouse.WarehouseId, ProductId = productsWarehouse.ProductId }, productsWarehouse.ProductCount))
+                            throw new Exception("Ошибка при добавлении сущности в кешь");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message);
+            }
+        }
+        public void InitStatickCash(ApplicationDbContext dbContext)
+        {
+            try
+            {
+                if (_statickCache.Count == 0)
                 {
                     var warehouseList = dbContext.Warehouses.Include(x => x.productsList).ToList();
                     foreach (var warehouse in warehouseList)
@@ -42,17 +73,16 @@ namespace BlazorApp1.Service
                         {
                             var productViewModel = new ProductViewModel
                             {
-                                ProdyctCount = product.count,
                                 ProdyctId = product.id,
                                 ProdyctName = product.name,
                             };
-                            if (_cache.ContainsKey(warehouseViewModel))
+                            if (_statickCache.ContainsKey(warehouseViewModel))
                             {
-                                UppdateItemInCash(warehouseViewModel, productViewModel);
+                                _statickCache[warehouseViewModel].Add(productViewModel);
                             }
                             else
                             {
-                                CreateItemInCash(warehouseViewModel, productViewModel);
+                                _statickCache.Add(warehouseViewModel, new List<ProductViewModel> { productViewModel });
                             }
                         }
                     }
@@ -63,83 +93,37 @@ namespace BlazorApp1.Service
                 _loger.LogError(ex, ex.Message);
             }
         }
-        public void CreateItemInCash(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        public void IncrementCount(int warehouseId, int productId)
         {
             try
             {
-                ConcurrentQueue<ProductViewModel> val = new ConcurrentQueue<ProductViewModel>(new List<ProductViewModel>() { productItem });
-                if (!_cache.TryAdd(warehouseItem, val))
-                    throw new Exception("Ошибка при добавлении сущности в кешь");
-            }
-            catch (Exception ex)
-            {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
-            }
-        }
-        public void UppdateItemInCash(WarehouseViewModel warehouseItem, ProductViewModel productItem)
-        {
-            try
-            {
-                ConcurrentQueue<ProductViewModel> val = new ConcurrentQueue<ProductViewModel>();
-                if (_cache.TryGetValue(warehouseItem, out val))
-                {
-                    val.Enqueue(productItem);
-                };
-            }
-            catch (Exception ex)
-            {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
-            }
-        }
-        public void IncrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
-        {
-            try
-            {
-                ConcurrentQueue<ProductViewModel> val = new ConcurrentQueue<ProductViewModel>();
-                if (_cache.TryGetValue(warehouseItem, out val))
-                {
-                    var prod = val.FirstOrDefault(x => x.ProdyctId == productItem.ProdyctId);
-                    if (prod != null)
-                    {
-                        prod.ProdyctCount++;
-                    }
-                }
+                var itemKey = _dinmickCache.FirstOrDefault(x => x.Key.ProductId == productId && x.Key.WarehouseId == warehouseId).Key;
+                _dinmickCache.AddOrUpdate(itemKey, 0, (key, value) => Interlocked.Increment(ref value));
                 Interlocked.Increment(ref _counter);
-                GetCash();
 
             }
             catch (Exception ex)
             {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
             }
         }
-        public void DecrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        public void DecrementCount(int warehouseId, int productId)
         {
             try
             {
-                ConcurrentQueue<ProductViewModel> val = new ConcurrentQueue<ProductViewModel>();
-                if (_cache.TryGetValue(warehouseItem, out val))
-                {
-
-                    var prod = val.FirstOrDefault(x => x.ProdyctId == productItem.ProdyctId);
-                    if (prod != null)
-                    {
-                        if (prod.ProdyctCount != 0)
-                            prod.ProdyctCount--;
-                    }
-                }
+                var itemKey = _dinmickCache.FirstOrDefault(x => x.Key.ProductId == productId && x.Key.WarehouseId == warehouseId).Key;
+                _dinmickCache.AddOrUpdate(itemKey, 0, (key, value) => Interlocked.Decrement(ref value));
                 Interlocked.Increment(ref _counter);
-                GetCash();
-
             }
             catch (Exception ex)
             {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
             }
-
         }
-        public void Clear() {
-            _cache = new ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>>();
+        public void Clear()
+        {
+            _dinmickCache = new ConcurrentDictionary<ProductWarehouseIds, int>();
+            _statickCache = new Dictionary<WarehouseViewModel, List<ProductViewModel>>();
         }
     }
 }

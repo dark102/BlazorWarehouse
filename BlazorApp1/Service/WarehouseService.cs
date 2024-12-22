@@ -29,7 +29,8 @@ namespace BlazorApp1.Service
         {
             try
             {
-                _cashService.InitCash(_dbContext);
+                _cashService.InitDinamickCash(_dbContext);
+                _cashService.InitStatickCash(_dbContext);
             }
             catch (Exception ex)
             {
@@ -54,11 +55,24 @@ namespace BlazorApp1.Service
             }
 
         }
-        public void IncrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        public int GetCountByIds(int warehouseId, int productId)
         {
             try
             {
-                _cashService.IncrementCount(warehouseItem, productItem);
+                return _cashService.GetCountByIds(new ProductWarehouseIds() { ProductId = productId, WarehouseId = warehouseId });
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
+                SaveCash();
+                return 0;
+            }
+        }
+        public void IncrementCount(int warehouseId, int productId)
+        {
+            try
+            {
+                _cashService.IncrementCount(warehouseId, productId);
                 if(GetCounter() % 1000 == 0)
                 {
                     SaveCash();
@@ -66,15 +80,15 @@ namespace BlazorApp1.Service
             }
             catch (Exception ex)
             {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
                 SaveCash();
             }
         }
-        public void DecrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        public void DecrementCount(int warehouseId, int productId)
         {
             try
             {
-                _cashService.DecrementCount(warehouseItem, productItem);
+                _cashService.DecrementCount(warehouseId, productId);
                 if (GetCounter() % 1000 == 0)
                 {
                     SaveCash();
@@ -83,7 +97,7 @@ namespace BlazorApp1.Service
             }
             catch (Exception ex)
             {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
                 SaveCash();
             }
 
@@ -102,11 +116,25 @@ namespace BlazorApp1.Service
 
             }
         }
-        public ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>> GetCash()
+        public ConcurrentDictionary<ProductWarehouseIds, int> GetDinamickCash()
         {
             try
             {
-                return _cashService.GetCash();
+                return _cashService.GetDinamickCash();
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message);
+                SaveCash();
+                return null;
+
+            }
+        }
+        public Dictionary<WarehouseViewModel, List<ProductViewModel>> GetStatickCash()
+        {
+            try
+            {
+                return _cashService.GetStatickCash();
             }
             catch (Exception ex)
             {
@@ -122,18 +150,10 @@ namespace BlazorApp1.Service
             {
                 lock (obj)
                 {
-                    foreach (var item in GetCash())
+                    foreach (var item in GetDinamickCash())
                     {
-                        var warehouse = _dbContext.Warehouses.Include(x => x.productsList).FirstOrDefault(x => x.id == item.Key.WarehouseId);
-                        foreach (var product in warehouse.productsList)
-                        {
-                            var prod = item.Value.FirstOrDefault(x => x.ProdyctId == product.id);
-                            if (prod != null)
-                            {
-                                product.count = prod.ProdyctCount;
-                                _dbContext.Products.Update(product);
-                            }
-                        }
+                        var warehouse = _dbContext.ProductsWarehouses.FirstOrDefault(x => x.WarehouseId == item.Key.WarehouseId && x.ProductId == item.Key.ProductId );
+                        warehouse.ProductCount = item.Value;
                     }
                     _dbContext.SaveChanges();
                     _cashService.Clear();

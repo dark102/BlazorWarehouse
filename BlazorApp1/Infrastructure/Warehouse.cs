@@ -5,5 +5,6 @@
         public int id { get; set; }
         public string name { get; set; }
         public List<Product> productsList { get; set; } = new();
+        public List<ProductWarehouse> ProductsWarehouses { get; set; } = new();
     }
 }

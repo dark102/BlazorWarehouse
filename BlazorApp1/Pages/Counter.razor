@@ -9,13 +9,13 @@
 @implements IDisposable
 
 <h1>Счетчик:@warehouseService.GetCounter()</h1>
-@if (warehouseService.GetCash().Count() == 0)
+@if (warehouseService.GetStatickCash().Count() == 0)
 {
 	<p><em>Loading...</em></p>
 }
 else
 {
-	@foreach (var warehouse in warehouseService.GetCash())
+	@foreach (var warehouse in warehouseService.GetStatickCash())
 	{
 		<h1>@warehouse.Key.WarehouseName</h1>
 		@if (warehouse.Value.Count() == 0)
@@ -37,9 +37,9 @@ else
 						<tr>
 							<td>@product.ProdyctName</td>
 							<td>
-								<button class="btn btn-primary" @onclick="@(e => warehouseService.DecrementCount(warehouse.Key, product))">-</button>
-								@product.ProdyctCount
-								<button class="btn btn-primary" @onclick="@(e => warehouseService.IncrementCount(warehouse.Key, product))">+</button>
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.DecrementCount(warehouse.Key.WarehouseId, product.ProdyctId))">-</button>
+								@warehouseService.GetCountByIds(warehouse.Key.WarehouseId, product.ProdyctId)
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.IncrementCount(warehouse.Key.WarehouseId, product.ProdyctId))">+</button>
 
 							</td>
 						</tr>

@@ -10,6 +10,7 @@ namespace BlazorApp1.Infrastructure
     {
         public DbSet<Product> Products => Set<Product>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+        public DbSet<ProductWarehouse> ProductsWarehouses => Set<ProductWarehouse>();
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder
@@ -27,46 +28,66 @@ namespace BlazorApp1.Infrastructure
             modelBuilder.Entity<Warehouse>()
             .HasMany(u => u.productsList)
             .WithMany(c => c.warehouseList)
-            .UsingEntity(j => j.ToTable("ProductsWarehouses"));
+           .UsingEntity<ProductWarehouse>(
+                   j => j
+                    .HasOne(pt => pt.Product)
+                    .WithMany(t => t.ProductsWarehouses)
+                    .HasForeignKey(pt => pt.ProductId),
+                   j => j
+                    .HasOne(pt => pt.Warehouse)
+                    .WithMany(p => p.ProductsWarehouses)
+                    .HasForeignKey(pt => pt.WarehouseId),
+                j =>
+                {
+                    
+                    j.Property(pt => pt.ProductCount).HasDefaultValue(0);
+                    j.HasKey(t => new { t.WarehouseId, t.ProductId });
+                    j.ToTable("ProductsWarehouses");
+                });
         }
         private async Task SeedDefaultDataAsync(DbContext context, CancellationToken cancellationToken)
         {
 
             if (!await context.Set<Product>().AnyAsync())
             {
-                var data = new Warehouse()
-                {
-                    name = "Склад №1",
-                    productsList = new List<Product>(){
+                var prodList = new List<Product>(){
                             new Product
                             {
-                                count = 1,
                                 name = "Продукт 1"
                             },
                             new Product
                             {
-                                count = 1,
                                 name = "Продукт 2"
                             },
                             new Product
                             {
-                                count = 1,
                                 name = "Продукт 3"
                             },
                             new Product
                             {
-                                count = 1,
                                 name = "Продукт 4"
                             },
                             new Product
                             {
-                                count = 1,
                                 name = "Продукт 5"
                             },
-                        }
+                        };
+                var data =  new List<Warehouse>()
+                {
+                    new Warehouse()
+                    {
+                        name = "Склад №1",
+                        productsList =prodList
+                    },
+                    new Warehouse()
+                    {
+                        name = "Склад №2",
+                        productsList =prodList
+                    }
 
                 };
-                context.Set<Warehouse>().Add(data);
+
+                context.Set<Warehouse>().AddRange(data);
                 await context.SaveChangesAsync(cancellationToken);
             }
         }

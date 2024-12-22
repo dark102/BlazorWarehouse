@@ -4,6 +4,5 @@
     {
         public int ProdyctId { get; set; }
         public string ProdyctName { get; set; }
-        public int ProdyctCount { get; set; }
     }
 }

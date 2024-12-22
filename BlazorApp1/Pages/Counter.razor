@@ -1,0 +1,66 @@
+﻿@page "/warehouseAndProductManagement"
+
+<PageTitle>Управление складами и товарами</PageTitle>
+
+@using BlazorApp1.Service
+@using BlazorApp1.Infrastructure
+@inject WarehouseService warehouseService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (this.warehouseService.warehouseList == null)
+{
+	<p><em>Loading...</em></p>
+}
+else
+{
+	@foreach (var warehouse in warehouseService.warehouseList)
+	{
+		<h1>@warehouse.name</h1>
+
+		@if (warehouse.productsList.Count() == 0)
+		{
+			<p><em>Loading...</em></p>
+		}
+		else
+		{
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Товар</th>
+						<th>Количество</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var product in warehouse.productsList)
+					{
+						<tr>
+							<td>@product.name</td>
+							<td>
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.DecrementCount(warehouse.id,product.id))">-</button>
+								@product.count
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.IncrementCount(warehouse.id,product.id))">+</button>
+
+							</td>
+
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	}
+
+}
+
+
+@code {
+	protected override async Task OnInitializedAsync()
+	{
+		warehouseService.GetWarehouseList();
+		Navigation.LocationChanged += warehouseService.HandleLocationChanged;
+	}
+	public void Dispose()
+	{
+		Navigation.LocationChanged -= warehouseService.HandleLocationChanged;
+	}
+}

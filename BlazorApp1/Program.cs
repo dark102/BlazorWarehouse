@@ -20,7 +20,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddSingleton<WarehouseService>();
+builder.Services.AddScoped<WarehouseService>();
+builder.Services.AddSingleton<CashService>();
 
 
 var app = builder.Build();

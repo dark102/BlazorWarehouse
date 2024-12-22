@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using BlazorApp1.Infrastructure;
+using BlazorApp1.ViewsModel;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -11,84 +12,143 @@ namespace BlazorApp1.Service
 {
     public class WarehouseService
     {
-        //public ConcurrentDictionary<int, Warehouse>? warehouseDictionary;
-        public List<Warehouse>? warehouseList;
+        object obj = new object();
+        private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<WarehouseService> _loger;
-        public WarehouseService(ILogger<WarehouseService> loger)
-        {
-            //dbContext = Utils.GetDbContext();
-            _loger = loger;
-            GetWarehouseList();
-        }
+        private readonly CashService _cashService;
+        public event Action OnChange;
 
-        public List<Warehouse>? GetWarehouseList()
+        public WarehouseService(ILogger<WarehouseService> loger, ApplicationDbContext dbContext, CashService cashService)
+        {
+            _dbContext = dbContext;
+            _loger = loger;
+            _dbContext = dbContext;
+            _cashService = cashService;
+        }
+        public void InitDictionary()
         {
             try
             {
-                //if (warehouseList == null)
-                //{
-                //    warehouseList = dbContext.Warehouses.Include(x => x.productsList).ToList();
-                //}
-                //return warehouseList.Count() > 0 ? warehouseList : null;
-                return warehouseList;
+                _cashService.InitCash(_dbContext);
             }
             catch (Exception ex)
             {
                 _loger.LogError(ex, ex.Message, new object[] { });
-                return null;
+                SaveCash();
             }
-
-        }
-        public void IncrementCount(int warehouseId, int productId)
-        {
-            try
-            {
-                throw new Exception("А вот!!!!!!!!!!!!!!!!!!");
-                //var prod = warehouseList.FirstOrDefault(x => x.id == warehouseId).productsList.FirstOrDefault(x => x.id == productId);
-                //prod.count++;
-                //dbContext.Products.Entry(prod).State = EntityState.Modified;
-            }
-            catch (Exception ex)
-            {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
-                //dbContext.SaveChanges();
-            }
-        }
-        public void DecrementCount(int warehouseId, int productId)
-        {
-            try
-            {
-                    //var prod = warehouseList.FirstOrDefault(x => x.id == warehouseId).productsList.FirstOrDefault(x => x.id == productId);
-                    //prod.count--;
-                    //dbContext.Products.Entry(prod).State = EntityState.Modified;
-            }
-            catch (Exception ex)
-            {
-                _loger.LogError(ex, ex.Message, new object[] { warehouseId, productId });
-                //dbContext.SaveChanges();
-            }
-
         }
         public void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
         {
-
-            //lock (obj)
-            //{
-            //    Console.WriteLine(i);
-            //    i++;
-            //}
             try
             {
                 if (!e.Location.Contains("/warehouseAndProductManagement"))
                 {
                     Console.WriteLine("Сохраняем");
-                    //dbContext.SaveChanges();
+                    SaveCash();
                 }
             }
-            catch(Exception ex) {
+            catch (Exception ex)
+            {
                 _loger.LogError(ex, ex.Message, new object[] { sender, e });
+                SaveCash();
             }
-            
+
+        }
+        public void IncrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        {
+            try
+            {
+                _cashService.IncrementCount(warehouseItem, productItem);
+                if(GetCounter() % 1000 == 0)
+                {
+                    SaveCash();
+                }
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                SaveCash();
+            }
+        }
+        public void DecrementCount(WarehouseViewModel warehouseItem, ProductViewModel productItem)
+        {
+            try
+            {
+                _cashService.DecrementCount(warehouseItem, productItem);
+                if (GetCounter() % 1000 == 0)
+                {
+                    SaveCash();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message, new object[] { warehouseItem, productItem });
+                SaveCash();
+            }
+
+        }
+        public int GetCounter()
+        {
+            try
+            {
+                return _cashService.GetCounter();
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message);
+                SaveCash();
+                return 0;
+
+            }
+        }
+        public ConcurrentDictionary<WarehouseViewModel, ConcurrentQueue<ProductViewModel>> GetCash()
+        {
+            try
+            {
+                return _cashService.GetCash();
+            }
+            catch (Exception ex)
+            {
+                _loger.LogError(ex, ex.Message);
+                SaveCash();
+                return null;
+
+            }
+        }
+        private void SaveCash()
+        {
+            try
+            {
+                lock (obj)
+                {
+                    foreach (var item in GetCash())
+                    {
+                        var warehouse = _dbContext.Warehouses.Include(x => x.productsList).FirstOrDefault(x => x.id == item.Key.WarehouseId);
+                        foreach (var product in warehouse.productsList)
+                        {
+                            var prod = item.Value.FirstOrDefault(x => x.ProdyctId == product.id);
+                            if (prod != null)
+                            {
+                                product.count = prod.ProdyctCount;
+                                _dbContext.Products.Update(product);
+                            }
+                        }
+                    }
+                    _dbContext.SaveChanges();
+                    _cashService.Clear();
+                    InitDictionary();
+                }
+            }
+            catch(Exception ex)
+            {
+                _loger.LogError(ex, ex.Message);
+                SaveInNotepad();
+            }
+        }
+        private void SaveInNotepad()
+        {
+           //TODO если с базой какая то проблема то сохраняем в фаил. что бы не потерять данные. и при инициализации нужен метод проверки наличия файла и пасинг его с занесением в базу
         }
     }
 }

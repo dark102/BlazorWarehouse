@@ -8,17 +8,17 @@
 @inject NavigationManager Navigation
 @implements IDisposable
 
-@if (this.warehouseService.warehouseList == null)
+<h1>Счетчик:@warehouseService.GetCounter()</h1>
+@if (warehouseService.GetCash().Count() == 0)
 {
 	<p><em>Loading...</em></p>
 }
 else
 {
-	@foreach (var warehouse in warehouseService.warehouseList)
+	@foreach (var warehouse in warehouseService.GetCash())
 	{
-		<h1>@warehouse.name</h1>
-
-		@if (warehouse.productsList.Count() == 0)
+		<h1>@warehouse.Key.WarehouseName</h1>
+		@if (warehouse.Value.Count() == 0)
 		{
 			<p><em>Loading...</em></p>
 		}
@@ -32,32 +32,31 @@ else
 					</tr>
 				</thead>
 				<tbody>
-					@foreach (var product in warehouse.productsList)
+					@foreach (var product in warehouse.Value)
 					{
 						<tr>
-							<td>@product.name</td>
+							<td>@product.ProdyctName</td>
 							<td>
-								<button class="btn btn-primary" @onclick="@(e => warehouseService.DecrementCount(warehouse.id,product.id))">-</button>
-								@product.count
-								<button class="btn btn-primary" @onclick="@(e => warehouseService.IncrementCount(warehouse.id,product.id))">+</button>
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.DecrementCount(warehouse.Key, product))">-</button>
+								@product.ProdyctCount
+								<button class="btn btn-primary" @onclick="@(e => warehouseService.IncrementCount(warehouse.Key, product))">+</button>
 
 							</td>
-
 						</tr>
 					}
 				</tbody>
 			</table>
 		}
 	}
-
 }
 
 
 @code {
 	protected override async Task OnInitializedAsync()
 	{
-		warehouseService.GetWarehouseList();
+		warehouseService.InitDictionary();
 		Navigation.LocationChanged += warehouseService.HandleLocationChanged;
+		warehouseService.OnChange += () => StateHasChanged();
 	}
 	public void Dispose()
 	{
